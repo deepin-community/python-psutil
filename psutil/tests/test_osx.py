@@ -6,20 +6,26 @@
 
 """macOS specific tests."""
 
+import platform
 import re
 import time
+import unittest
 
 import psutil
 from psutil import MACOS
+from psutil import POSIX
 from psutil.tests import HAS_BATTERY
+from psutil.tests import TOLERANCE_DISK_USAGE
+from psutil.tests import TOLERANCE_SYS_MEM
 from psutil.tests import PsutilTestCase
 from psutil.tests import retry_on_failure
 from psutil.tests import sh
 from psutil.tests import spawn_testproc
 from psutil.tests import terminate
-from psutil.tests import TOLERANCE_DISK_USAGE
-from psutil.tests import TOLERANCE_SYS_MEM
-from psutil.tests import unittest
+
+
+if POSIX:
+    from psutil._psutil_posix import getpagesize
 
 
 def sysctl(cmdline):
@@ -36,8 +42,6 @@ def sysctl(cmdline):
 
 def vm_stat(field):
     """Wrapper around 'vm_stat' cmdline utility."""
-    from psutil._psutil_posix import getpagesize
-
     out = sh('vm_stat')
     for line in out.split('\n'):
         if field in line:
@@ -45,33 +49,6 @@ def vm_stat(field):
     else:
         raise ValueError("line not found")
     return int(re.search(r'\d+', line).group(0)) * getpagesize()
-
-
-# http://code.activestate.com/recipes/578019/
-def human2bytes(s):
-    SYMBOLS = {
-        'customary': ('B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'),
-    }
-    init = s
-    num = ""
-    while s and s[0:1].isdigit() or s[0:1] == '.':
-        num += s[0]
-        s = s[1:]
-    num = float(num)
-    letter = s.strip()
-    for name, sset in SYMBOLS.items():
-        if letter in sset:
-            break
-    else:
-        if letter == 'k':
-            sset = SYMBOLS['customary']
-            letter = letter.upper()
-        else:
-            raise ValueError("can't interpret %r" % init)
-    prefix = {sset[0]: 1}
-    for i, s in enumerate(sset[1:]):
-        prefix[s] = 1 << (i + 1) * 10
-    return int(num * prefix[letter])
 
 
 @unittest.skipIf(not MACOS, "MACOS only")
@@ -137,10 +114,12 @@ class TestSystemAPIs(PsutilTestCase):
         num = sysctl("sysctl hw.logicalcpu")
         self.assertEqual(num, psutil.cpu_count(logical=True))
 
-    def test_cpu_count_physical(self):
+    def test_cpu_count_cores(self):
         num = sysctl("sysctl hw.physicalcpu")
         self.assertEqual(num, psutil.cpu_count(logical=False))
 
+    # TODO: remove this once 1892 is fixed
+    @unittest.skipIf(platform.machine() == 'arm64', "skipped due to #1892")
     def test_cpu_freq(self):
         freq = psutil.cpu_freq()
         self.assertEqual(
@@ -186,23 +165,13 @@ class TestSystemAPIs(PsutilTestCase):
     def test_swapmem_sin(self):
         vmstat_val = vm_stat("Pageins")
         psutil_val = psutil.swap_memory().sin
-        self.assertEqual(psutil_val, vmstat_val)
+        self.assertAlmostEqual(psutil_val, vmstat_val, delta=TOLERANCE_SYS_MEM)
 
     @retry_on_failure()
     def test_swapmem_sout(self):
         vmstat_val = vm_stat("Pageout")
         psutil_val = psutil.swap_memory().sout
-        self.assertEqual(psutil_val, vmstat_val)
-
-    # Not very reliable.
-    # def test_swapmem_total(self):
-    #     out = sh('sysctl vm.swapusage')
-    #     out = out.replace('vm.swapusage: ', '')
-    #     total, used, free = re.findall('\d+.\d+\w', out)
-    #     psutil_smem = psutil.swap_memory()
-    #     self.assertEqual(psutil_smem.total, human2bytes(total))
-    #     self.assertEqual(psutil_smem.used, human2bytes(used))
-    #     self.assertEqual(psutil_smem.free, human2bytes(free))
+        self.assertAlmostEqual(psutil_val, vmstat_val, delta=TOLERANCE_SYS_MEM)
 
     # --- network
 

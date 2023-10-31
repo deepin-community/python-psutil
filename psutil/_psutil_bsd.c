@@ -63,7 +63,11 @@
 #include "_psutil_posix.h"
 
 #ifdef PSUTIL_FREEBSD
-    #include "arch/freebsd/specific.h"
+    #include "arch/freebsd/cpu.h"
+    #include "arch/freebsd/mem.h"
+    #include "arch/freebsd/disk.h"
+    #include "arch/freebsd/sensors.h"
+    #include "arch/freebsd/proc.h"
     #include "arch/freebsd/sys_socks.h"
     #include "arch/freebsd/proc_socks.h"
 
@@ -76,7 +80,11 @@
         #include <utmpx.h>
     #endif
 #elif PSUTIL_OPENBSD
-    #include "arch/openbsd/specific.h"
+    #include "arch/openbsd/cpu.h"
+    #include "arch/openbsd/disk.h"
+    #include "arch/openbsd/mem.h"
+    #include "arch/openbsd/proc.h"
+    #include "arch/openbsd/socks.h"
 
     #include <utmp.h>
     #include <sys/vnode.h>  // for VREG
@@ -85,7 +93,10 @@
     #undef _KERNEL
     #include <sys/sched.h>  // for CPUSTATES & CP_*
 #elif PSUTIL_NETBSD
-    #include "arch/netbsd/specific.h"
+    #include "arch/netbsd/cpu.h"
+    #include "arch/netbsd/disk.h"
+    #include "arch/netbsd/mem.h"
+    #include "arch/netbsd/proc.h"
     #include "arch/netbsd/socks.h"
 
     #include <utmpx.h>
@@ -99,12 +110,6 @@
 
 // convert a timeval struct to a double
 #define PSUTIL_TV2DOUBLE(t) ((t).tv_sec + (t).tv_usec / 1000000.0)
-
-#ifdef PSUTIL_FREEBSD
-    // convert a bintime struct to milliseconds
-    #define PSUTIL_BT2MSEC(bt) (bt.sec * 1000 + (((uint64_t) 1000000000 * \
-                           (uint32_t) (bt.frac >> 32) ) >> 32 ) / 1000000)
-#endif
 
 #if defined(PSUTIL_OPENBSD) || defined (PSUTIL_NETBSD)
     #define PSUTIL_KPT2DOUBLE(t) (t ## _sec + t ## _usec / 1000000.0)
@@ -965,11 +970,11 @@ psutil_users(PyObject *self, PyObject *args) {
         if (! py_hostname)
             goto error;
         py_tuple = Py_BuildValue(
-            "(OOOfi)",
+            "(OOOdi)",
             py_username,        // username
             py_tty,             // tty
             py_hostname,        // hostname
-            (float)ut.ut_time,  // start time
+            (double)ut.ut_time,  // start time
 #if defined(PSUTIL_OPENBSD) || (defined(__FreeBSD_version) && __FreeBSD_version < 900000)
             -1                  // process id (set to None later)
 #else
@@ -1015,11 +1020,11 @@ psutil_users(PyObject *self, PyObject *args) {
             goto error;
 
         py_tuple = Py_BuildValue(
-            "(OOOfO)",
+            "(OOOdO)",
             py_username,   // username
             py_tty,        // tty
             py_hostname,   // hostname
-            (float)utx->ut_tv.tv_sec,  // start time
+            (double)utx->ut_tv.tv_sec,  // start time
             py_pid         // process id
         );
 
@@ -1059,92 +1064,55 @@ error:
 static PyMethodDef mod_methods[] = {
     // --- per-process functions
 
-    {"proc_oneshot_info", psutil_proc_oneshot_info, METH_VARARGS,
-     "Return multiple info about a process"},
-    {"proc_name", psutil_proc_name, METH_VARARGS,
-     "Return process name"},
-    {"proc_cmdline", psutil_proc_cmdline, METH_VARARGS,
-     "Return process cmdline as a list of cmdline arguments"},
-    {"proc_threads", psutil_proc_threads, METH_VARARGS,
-     "Return process threads"},
-#if defined(PSUTIL_FREEBSD) || defined(PSUTIL_OPENBSD)
-    {"proc_connections", psutil_proc_connections, METH_VARARGS,
-     "Return connections opened by process"},
+    {"proc_cmdline", psutil_proc_cmdline, METH_VARARGS},
+    {"proc_name", psutil_proc_name, METH_VARARGS},
+    {"proc_oneshot_info", psutil_proc_oneshot_info, METH_VARARGS},
+    {"proc_threads", psutil_proc_threads, METH_VARARGS},
+#if defined(PSUTIL_FREEBSD)
+    {"proc_connections", psutil_proc_connections, METH_VARARGS},
 #endif
-    {"proc_cwd", psutil_proc_cwd, METH_VARARGS,
-     "Return process current working directory."},
+    {"proc_cwd", psutil_proc_cwd, METH_VARARGS},
 #if defined(__FreeBSD_version) && __FreeBSD_version >= 800000 || PSUTIL_OPENBSD || defined(PSUTIL_NETBSD)
-    {"proc_num_fds", psutil_proc_num_fds, METH_VARARGS,
-     "Return the number of file descriptors opened by this process"},
-    {"proc_open_files", psutil_proc_open_files, METH_VARARGS,
-     "Return files opened by process as a list of (path, fd) tuples"},
+    {"proc_num_fds", psutil_proc_num_fds, METH_VARARGS},
+    {"proc_open_files", psutil_proc_open_files, METH_VARARGS},
 #endif
 #if defined(PSUTIL_FREEBSD) || defined(PSUTIL_NETBSD)
-    {"proc_num_threads", psutil_proc_num_threads, METH_VARARGS,
-     "Return number of threads used by process"},
+    {"proc_num_threads", psutil_proc_num_threads, METH_VARARGS},
 #endif
 #if defined(PSUTIL_FREEBSD)
-    {"proc_exe", psutil_proc_exe, METH_VARARGS,
-     "Return process pathname executable"},
-    {"proc_memory_maps", psutil_proc_memory_maps, METH_VARARGS,
-     "Return a list of tuples for every process's memory map"},
-    {"proc_cpu_affinity_get", psutil_proc_cpu_affinity_get, METH_VARARGS,
-     "Return process CPU affinity."},
-    {"proc_cpu_affinity_set", psutil_proc_cpu_affinity_set, METH_VARARGS,
-     "Set process CPU affinity."},
-    {"proc_getrlimit", psutil_proc_getrlimit, METH_VARARGS,
-     "Get process resource limits."},
-    {"proc_setrlimit", psutil_proc_setrlimit, METH_VARARGS,
-     "Set process resource limits."},
-    {"cpu_count_phys", psutil_cpu_count_phys, METH_VARARGS,
-     "Return an XML string to determine the number physical CPUs."},
+    {"cpu_topology", psutil_cpu_topology, METH_VARARGS},
+    {"proc_cpu_affinity_get", psutil_proc_cpu_affinity_get, METH_VARARGS},
+    {"proc_cpu_affinity_set", psutil_proc_cpu_affinity_set, METH_VARARGS},
+    {"proc_exe", psutil_proc_exe, METH_VARARGS},
+    {"proc_getrlimit", psutil_proc_getrlimit, METH_VARARGS},
+    {"proc_memory_maps", psutil_proc_memory_maps, METH_VARARGS},
+    {"proc_setrlimit", psutil_proc_setrlimit, METH_VARARGS},
 #endif
-    {"proc_environ", psutil_proc_environ, METH_VARARGS,
-     "Return process environment"},
+    {"proc_environ", psutil_proc_environ, METH_VARARGS},
 
     // --- system-related functions
-
-    {"pids", psutil_pids, METH_VARARGS,
-     "Returns a list of PIDs currently running on the system"},
-    {"cpu_count_logical", psutil_cpu_count_logical, METH_VARARGS,
-     "Return number of logical CPUs on the system"},
-    {"virtual_mem", psutil_virtual_mem, METH_VARARGS,
-     "Return system virtual memory usage statistics"},
-    {"swap_mem", psutil_swap_mem, METH_VARARGS,
-     "Return swap mem stats"},
-    {"cpu_times", psutil_cpu_times, METH_VARARGS,
-     "Return system cpu times as a tuple (user, system, nice, idle, irc)"},
-    {"per_cpu_times", psutil_per_cpu_times, METH_VARARGS,
-     "Return system per-cpu times as a list of tuples"},
-    {"boot_time", psutil_boot_time, METH_VARARGS,
-     "Return the system boot time expressed in seconds since the epoch."},
-    {"disk_partitions", psutil_disk_partitions, METH_VARARGS,
-     "Return a list of tuples including device, mount point and "
-     "fs type for all partitions mounted on the system."},
-    {"net_io_counters", psutil_net_io_counters, METH_VARARGS,
-     "Return dict of tuples of networks I/O information."},
-    {"disk_io_counters", psutil_disk_io_counters, METH_VARARGS,
-     "Return a Python dict of tuples for disk I/O information"},
-    {"users", psutil_users, METH_VARARGS,
-     "Return currently connected users as a list of tuples"},
-    {"cpu_stats", psutil_cpu_stats, METH_VARARGS,
-     "Return CPU statistics"},
-#if defined(PSUTIL_FREEBSD) || defined(PSUTIL_NETBSD)
-    {"net_connections", psutil_net_connections, METH_VARARGS,
-     "Return system-wide open connections."},
+    {"boot_time", psutil_boot_time, METH_VARARGS},
+    {"cpu_count_logical", psutil_cpu_count_logical, METH_VARARGS},
+    {"cpu_stats", psutil_cpu_stats, METH_VARARGS},
+    {"cpu_times", psutil_cpu_times, METH_VARARGS},
+    {"disk_io_counters", psutil_disk_io_counters, METH_VARARGS},
+    {"disk_partitions", psutil_disk_partitions, METH_VARARGS},
+    {"net_connections", psutil_net_connections, METH_VARARGS},
+    {"net_io_counters", psutil_net_io_counters, METH_VARARGS},
+    {"per_cpu_times", psutil_per_cpu_times, METH_VARARGS},
+    {"pids", psutil_pids, METH_VARARGS},
+    {"swap_mem", psutil_swap_mem, METH_VARARGS},
+    {"users", psutil_users, METH_VARARGS},
+    {"virtual_mem", psutil_virtual_mem, METH_VARARGS},
+#if defined(PSUTIL_FREEBSD) || defined(PSUTIL_OPENBSD)
+     {"cpu_freq", psutil_cpu_freq, METH_VARARGS},
 #endif
 #if defined(PSUTIL_FREEBSD)
-    {"sensors_battery", psutil_sensors_battery, METH_VARARGS,
-     "Return battery information."},
-    {"sensors_cpu_temperature", psutil_sensors_cpu_temperature, METH_VARARGS,
-     "Return temperature information for a given CPU core number."},
-    {"cpu_frequency", psutil_cpu_freq, METH_VARARGS,
-     "Return frequency of a given CPU"},
+    {"sensors_battery", psutil_sensors_battery, METH_VARARGS},
+    {"sensors_cpu_temperature", psutil_sensors_cpu_temperature, METH_VARARGS},
 #endif
-
     // --- others
-    {"set_testing", psutil_set_testing, METH_NOARGS,
-     "Set psutil in testing mode"},
+    {"set_debug", psutil_set_debug, METH_VARARGS},
 
     {NULL, NULL, 0, NULL}
 };

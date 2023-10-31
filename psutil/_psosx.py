@@ -4,7 +4,6 @@
 
 """macOS platform implementation."""
 
-import contextlib
 import errno
 import functools
 import os
@@ -15,14 +14,14 @@ from . import _psposix
 from . import _psutil_osx as cext
 from . import _psutil_posix as cext_posix
 from ._common import AccessDenied
+from ._common import NoSuchProcess
+from ._common import ZombieProcess
 from ._common import conn_tmap
 from ._common import conn_to_ntuple
 from ._common import isfile_strict
 from ._common import memoize_when_activated
-from ._common import NoSuchProcess
 from ._common import parse_environ_block
 from ._common import usage_percent
-from ._common import ZombieProcess
 from ._compat import PermissionError
 from ._compat import ProcessLookupError
 
@@ -159,9 +158,9 @@ def cpu_count_logical():
     return cext.cpu_count_logical()
 
 
-def cpu_count_physical():
-    """Return the number of physical CPUs in the system."""
-    return cext.cpu_count_phys()
+def cpu_count_cores():
+    """Return the number of CPU cores in the system."""
+    return cext.cpu_count_cores()
 
 
 def cpu_stats():
@@ -264,7 +263,7 @@ def net_if_stats():
     for name in names:
         try:
             mtu = cext_posix.net_if_mtu(name)
-            isup = cext_posix.net_if_is_running(name)
+            flags = cext_posix.net_if_flags(name)
             duplex, speed = cext_posix.net_if_duplex_speed(name)
         except OSError as err:
             # https://github.com/giampaolo/psutil/issues/1279
@@ -273,7 +272,10 @@ def net_if_stats():
         else:
             if hasattr(_common, 'NicDuplex'):
                 duplex = _common.NicDuplex(duplex)
-            ret[name] = _common.snicstats(isup, duplex, speed, mtu)
+            output_flags = ','.join(flags)
+            isup = 'running' in flags
+            ret[name] = _common.snicstats(isup, duplex, speed, mtu,
+                                          output_flags)
     return ret
 
 
@@ -354,32 +356,6 @@ def wrap_exceptions(fun):
     return wrapper
 
 
-@contextlib.contextmanager
-def catch_zombie(proc):
-    """There are some poor C APIs which incorrectly raise ESRCH when
-    the process is still alive or it's a zombie, or even RuntimeError
-    (those who don't set errno). This is here in order to solve:
-    https://github.com/giampaolo/psutil/issues/1044
-    """
-    try:
-        yield
-    except (OSError, RuntimeError) as err:
-        if isinstance(err, RuntimeError) or err.errno == errno.ESRCH:
-            try:
-                # status() is not supposed to lie and correctly detect
-                # zombies so if it raises ESRCH it's true.
-                status = proc.status()
-            except NoSuchProcess:
-                raise err
-            else:
-                if status == _common.STATUS_ZOMBIE:
-                    raise ZombieProcess(proc.pid, proc._name, proc._ppid)
-                else:
-                    raise AccessDenied(proc.pid, proc._name)
-        else:
-            raise
-
-
 class Process(object):
     """Wrapper class around underlying C implementation."""
 
@@ -402,8 +378,7 @@ class Process(object):
     @memoize_when_activated
     def _get_pidtaskinfo(self):
         # Note: should work for PIDs owned by user only.
-        with catch_zombie(self):
-            ret = cext.proc_pidtaskinfo_oneshot(self.pid)
+        ret = cext.proc_pidtaskinfo_oneshot(self.pid)
         assert len(ret) == len(pidtaskinfo_map)
         return ret
 
@@ -422,18 +397,15 @@ class Process(object):
 
     @wrap_exceptions
     def exe(self):
-        with catch_zombie(self):
-            return cext.proc_exe(self.pid)
+        return cext.proc_exe(self.pid)
 
     @wrap_exceptions
     def cmdline(self):
-        with catch_zombie(self):
-            return cext.proc_cmdline(self.pid)
+        return cext.proc_cmdline(self.pid)
 
     @wrap_exceptions
     def environ(self):
-        with catch_zombie(self):
-            return parse_environ_block(cext.proc_environ(self.pid))
+        return parse_environ_block(cext.proc_environ(self.pid))
 
     @wrap_exceptions
     def ppid(self):
@@ -442,8 +414,7 @@ class Process(object):
 
     @wrap_exceptions
     def cwd(self):
-        with catch_zombie(self):
-            return cext.proc_cwd(self.pid)
+        return cext.proc_cwd(self.pid)
 
     @wrap_exceptions
     def uids(self):
@@ -516,8 +487,7 @@ class Process(object):
         if self.pid == 0:
             return []
         files = []
-        with catch_zombie(self):
-            rawlist = cext.proc_open_files(self.pid)
+        rawlist = cext.proc_open_files(self.pid)
         for path, fd in rawlist:
             if isfile_strict(path):
                 ntuple = _common.popenfile(path, fd)
@@ -530,8 +500,7 @@ class Process(object):
             raise ValueError("invalid %r kind argument; choose between %s"
                              % (kind, ', '.join([repr(x) for x in conn_tmap])))
         families, types = conn_tmap[kind]
-        with catch_zombie(self):
-            rawlist = cext.proc_connections(self.pid, families, types)
+        rawlist = cext.proc_connections(self.pid, families, types)
         ret = []
         for item in rawlist:
             fd, fam, type, laddr, raddr, status = item
@@ -544,8 +513,7 @@ class Process(object):
     def num_fds(self):
         if self.pid == 0:
             return 0
-        with catch_zombie(self):
-            return cext.proc_num_fds(self.pid)
+        return cext.proc_num_fds(self.pid)
 
     @wrap_exceptions
     def wait(self, timeout=None):
@@ -553,13 +521,11 @@ class Process(object):
 
     @wrap_exceptions
     def nice_get(self):
-        with catch_zombie(self):
-            return cext_posix.getpriority(self.pid)
+        return cext_posix.getpriority(self.pid)
 
     @wrap_exceptions
     def nice_set(self, value):
-        with catch_zombie(self):
-            return cext_posix.setpriority(self.pid, value)
+        return cext_posix.setpriority(self.pid, value)
 
     @wrap_exceptions
     def status(self):

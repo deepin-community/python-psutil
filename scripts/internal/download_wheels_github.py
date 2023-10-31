@@ -18,8 +18,10 @@ https://developer.github.com/v3/actions/artifacts/
 import argparse
 import json
 import os
-import requests
+import sys
 import zipfile
+
+import requests
 
 from psutil import __version__ as PSUTIL_VERSION
 from psutil._common import bytes2human
@@ -79,10 +81,18 @@ def run():
 def main():
     global TOKEN
     parser = argparse.ArgumentParser(description='GitHub wheels downloader')
-    parser.add_argument('--tokenfile', required=True)
+    parser.add_argument('--token')
+    parser.add_argument('--tokenfile')
     args = parser.parse_args()
-    with open(os.path.expanduser(args.tokenfile)) as f:
-        TOKEN = f.read().strip()
+
+    if args.tokenfile:
+        with open(os.path.expanduser(args.tokenfile)) as f:
+            TOKEN = f.read().strip()
+    elif args.token:
+        TOKEN = args.token
+    else:
+        return sys.exit('specify --token or --tokenfile args')
+
     try:
         run()
     finally:

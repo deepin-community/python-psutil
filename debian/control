@@ -10,8 +10,7 @@ Build-Depends: debhelper-compat (= 13),
                python3-setuptools,
                python3-sphinx,
                python3-sphinx-rtd-theme,
-Standards-Version: 4.5.1
-XS-Python-Version: all
+Standards-Version: 4.6.1.0
 Homepage: https://github.com/giampaolo/psutil
 Vcs-Git: https://salsa.debian.org/python-team/packages/python-psutil.git
 Vcs-Browser: https://salsa.debian.org/python-team/packages/python-psutil

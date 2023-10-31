@@ -1,6 +1,6 @@
-|  |downloads| |stars| |forks| |contributors| |coverage| |quality|
+|  |downloads| |stars| |forks| |contributors| |coverage|
 |  |version| |py-versions| |packages| |license|
-|  |github-actions| |appveyor| |doc| |twitter| |tidelift|
+|  |github-actions-wheels|  |github-actions-bsd| |appveyor| |doc| |twitter| |tidelift|
 
 .. |downloads| image:: https://img.shields.io/pypi/dm/psutil.svg
     :target: https://pepy.tech/project/psutil
@@ -18,24 +18,24 @@
     :target: https://github.com/giampaolo/psutil/graphs/contributors
     :alt: Contributors
 
-.. |quality| image:: https://img.shields.io/codacy/grade/ce63e7f7f69d44b5b59682196e6fbfca.svg
-    :target: https://www.codacy.com/app/g-rodola/psutil?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=giampaolo/psutil&amp;utm_campaign=Badge_Grade
-    :alt: Code quality
+.. |github-actions-wheels| image:: https://img.shields.io/github/actions/workflow/status/giampaolo/psutil/.github/workflows/build.yml?label=Linux%2C%20macOS%2C%20Windows
+    :target: https://github.com/giampaolo/psutil/actions?query=workflow%3Abuild
+    :alt: Linux, macOS, Windows
 
-.. |github-actions| image:: https://img.shields.io/github/workflow/status/giampaolo/psutil/CI?label=Linux%2C%20macOS%2C%20FreeBSD
-    :target: https://github.com/giampaolo/psutil/actions?query=workflow%3ACI
-    :alt: Linux, macOS, Windows tests
+.. |github-actions-bsd| image:: https://img.shields.io/github/actions/workflow/status/giampaolo/psutil/.github/workflows/bsd.yml?label=FreeBSD,%20NetBSD,%20OpenBSD
+    :target: https://github.com/giampaolo/psutil/actions?query=workflow%3Absd-tests
+    :alt: FreeBSD, NetBSD, OpenBSD
 
-.. |appveyor| image:: https://img.shields.io/appveyor/ci/giampaolo/psutil/master.svg?maxAge=3600&label=Windows
+.. |appveyor| image:: https://img.shields.io/appveyor/build/giampaolo/psutil/master.svg?maxAge=3600&label=Windows%20(py2)
     :target: https://ci.appveyor.com/project/giampaolo/psutil
-    :alt: Windows tests (Appveyor)
+    :alt: Windows (Appveyor)
 
 .. |coverage| image:: https://coveralls.io/repos/github/giampaolo/psutil/badge.svg?branch=master
     :target: https://coveralls.io/github/giampaolo/psutil?branch=master
     :alt: Test coverage (coverall.io)
 
 .. |doc| image:: https://readthedocs.org/projects/psutil/badge/?version=latest
-    :target: http://psutil.readthedocs.io/en/latest/?badge=latest
+    :target: https://psutil.readthedocs.io/en/latest/
     :alt: Documentation Status
 
 .. |version| image:: https://img.shields.io/pypi/v/psutil.svg?label=pypi
@@ -43,7 +43,6 @@
     :alt: Latest version
 
 .. |py-versions| image:: https://img.shields.io/pypi/pyversions/psutil.svg
-    :target: https://pypi.org/project/psutil
     :alt: Supported Python versions
 
 .. |packages| image:: https://repology.org/badge/tiny-repos/python:psutil.svg
@@ -99,7 +98,7 @@ psutil currently supports the following platforms:
 - **Sun Solaris**
 - **AIX**
 
-Supported Python versions are **2.6**, **2.7**, **3.4+** and
+Supported Python versions are **2.7**, **3.4+** and
 `PyPy <http://pypy.org/>`__.
 
 Funding
@@ -110,7 +109,7 @@ immensely from some funding.
 Keeping up with bug reports and maintenance has become hardly sustainable for
 me alone in terms of time.
 If you're a company that's making significant use of psutil you can consider
-becoming a sponsor via `GitHub <https://github.com/sponsors/giampaolo>`__,
+becoming a sponsor via `GitHub Sponsors <https://github.com/sponsors/giampaolo>`__,
 `Open Collective <https://opencollective.com/psutil>`__ or
 `PayPal <https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=A9ZS7PKKRM3S8>`__
 and have your logo displayed in here and psutil `doc <https://psutil.readthedocs.io>`__.
@@ -122,7 +121,11 @@ Sponsors
 
     <div>
         <a href="https://tidelift.com/subscription/pkg/pypi-psutil?utm_source=pypi-psutil&utm_medium=referral&utm_campaign=readme">
-            <img src="https://github.com/giampaolo/psutil/raw/master/docs/_static/tidelift-logo.png" />
+            <img width="185" src="https://github.com/giampaolo/psutil/raw/master/docs/_static/tidelift-logo.svg" />
+        </a>
+        &nbsp;&nbsp
+        <a href="https://sansec.io/">
+            <img src="https://sansec.io/assets/images/logo.svg" />
         </a>
     </div>
     <sup><a href="https://github.com/sponsors/giampaolo">add your logo</a></sup>
@@ -130,16 +133,30 @@ Sponsors
 Supporters
 ==========
 
-None yet.
-
 .. raw:: html
 
+    <div>
+      <a href="https://github.com/dbwiddis"><img height="40" width="40" title="Daniel Widdis" src="https://avatars1.githubusercontent.com/u/9291703?s=88&amp;v=4" /></a>
+      <a href="https://github.com/aristocratos"><img height="40" width="40" title="aristocratos" src="https://avatars3.githubusercontent.com/u/59659483?s=96&amp;v=4" /></a>
+      <a href="https://github.com/cybersecgeek"><img height="40" width="40" title="cybersecgeek" src="https://avatars.githubusercontent.com/u/12847926?v=4" /></a>
+      <a href="https://github.com/scoutapm-sponsorships"><img height="40" width="40" title="scoutapm-sponsorships" src="https://avatars.githubusercontent.com/u/71095532?v=4" /></a>
+      <a href="https://opencollective.com/chenyoo-hao"><img height="40" width="40" title="Chenyoo Hao" src="https://images.opencollective.com/chenyoo-hao/avatar/40.png" /></a>
+      <a href="https://opencollective.com/alexey-vazhnov"><img height="40" width="40" title="Alexey Vazhnov" src="https://images.opencollective.com/alexey-vazhnov/daed334/avatar/40.png" /></a>
+      <a href="https://github.com/indeedeng"><img height="40" width="40" title="indeedeng" src="https://avatars.githubusercontent.com/u/2905043?s=200&v=4" /></a>
+      <a href="https://github.com/PySimpleGUI"><img height="40" width="40" title="PySimpleGUI" src="https://avatars.githubusercontent.com/u/46163555?v=4" /></a>
+      <a href="https://github.com/u93"><img height="40" width="40" title="Eugenio E Breijo" src="https://avatars.githubusercontent.com/u/16807302?v=4" /></a>
+      <a href="https://github.com/guilt"><img height="40" width="40" title="Karthik Kumar Viswanathan" src="https://avatars.githubusercontent.com/u/195178?v=4" /></a>
+      <a href="https://github.com/eallrich"><img height="40" width="40" title="Evan Allrich" src="https://avatars.githubusercontent.com/u/17393?v=4" /></a>
+      <a href="https://github.com/robusta-dev"><img height="40" width="40" title="Robusta" src="https://avatars.githubusercontent.com/u/82757710?s=200&v=4" /></a>
+
+    </div>
     <sup><a href="https://github.com/sponsors/giampaolo">add your avatar</a></sup>
+
 
 Contributing
 ============
 
-See `CONTRIBUTING.md <https://github.com/giampaolo/psutil/blob/master/CONTRIBUTING.md>`__ guidelines.
+See `contributing guidelines <https://github.com/giampaolo/psutil/blob/master/CONTRIBUTING.md>`__.
 
 Example usages
 ==============
@@ -209,7 +226,7 @@ Disks
 
     >>> psutil.disk_partitions()
     [sdiskpart(device='/dev/sda1', mountpoint='/', fstype='ext4', opts='rw,nosuid', maxfile=255, maxpath=4096),
-     sdiskpart(device='/dev/sda2', mountpoint='/home', fstype='ext, opts='rw', maxfile=255, maxpath=4096)]
+     sdiskpart(device='/dev/sda2', mountpoint='/home', fstype='ext', opts='rw', maxfile=255, maxpath=4096)]
     >>>
     >>> psutil.disk_usage('/')
     sdiskusage(total=21378641920, used=4809781248, free=15482871808, percent=22.5)
@@ -241,8 +258,8 @@ Network
                snicaddr(family=<AddressFamily.AF_LINK: 17>, address='c4:85:08:45:06:41', netmask=None, broadcast='ff:ff:ff:ff:ff:ff', ptp=None)]}
     >>>
     >>> psutil.net_if_stats()
-    {'lo': snicstats(isup=True, duplex=<NicDuplex.NIC_DUPLEX_UNKNOWN: 0>, speed=0, mtu=65536),
-     'wlan0': snicstats(isup=True, duplex=<NicDuplex.NIC_DUPLEX_FULL: 2>, speed=100, mtu=1500)}
+    {'lo': snicstats(isup=True, duplex=<NicDuplex.NIC_DUPLEX_UNKNOWN: 0>, speed=0, mtu=65536, flags='up,loopback,running'),
+     'wlan0': snicstats(isup=True, duplex=<NicDuplex.NIC_DUPLEX_FULL: 2>, speed=100, mtu=1500, flags='up,broadcast,running,multicast')}
     >>>
 
 Sensors
@@ -296,9 +313,9 @@ Process management
     >>> p
     psutil.Process(pid=7055, name='python3', status='running', started='09:04:44')
     >>> p.name()
-    'python'
+    'python3'
     >>> p.exe()
-    '/usr/bin/python'
+    '/usr/bin/python3'
     >>> p.cwd()
     '/home/giampaolo'
     >>> p.cmdline()
@@ -441,23 +458,6 @@ Further process APIs
     >>> gone, alive = psutil.wait_procs(procs_list, timeout=3, callback=on_terminate)
     >>>
 
-Popen wrapper:
-
-.. code-block:: python
-
-    >>> import psutil
-    >>> from subprocess import PIPE
-    >>> p = psutil.Popen(["/usr/bin/python", "-c", "print('hello')"], stdout=PIPE)
-    >>> p.name()
-    'python'
-    >>> p.username()
-    'giampaolo'
-    >>> p.communicate()
-    ('hello\n', None)
-    >>> p.wait(timeout=2)
-    0
-    >>>
-
 Windows services
 ----------------
 
@@ -499,14 +499,3 @@ Portings
 - C: https://github.com/hamon-in/cpslib
 - Rust: https://github.com/rust-psutil/rust-psutil
 - Nim: https://github.com/johnscillieri/psutil-nim
-
-Security
-========
-
-To report a security vulnerability, please use the `Tidelift security
-contact`_.  Tidelift will coordinate the fix and disclosure.
-
-.. _`Giampaolo Rodola`: https://gmpy.dev/about
-.. _`donation`: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=A9ZS7PKKRM3S8
-.. _Tidelift security contact: https://tidelift.com/security
-.. _Tidelift Subscription: https://tidelift.com/subscription/pkg/pypi-psutil?utm_source=pypi-psutil&utm_medium=referral&utm_campaign=readme

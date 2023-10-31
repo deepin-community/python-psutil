@@ -9,24 +9,24 @@ import errno
 import functools
 import os
 import xml.etree.ElementTree as ET
-from collections import namedtuple
 from collections import defaultdict
+from collections import namedtuple
 
 from . import _common
 from . import _psposix
 from . import _psutil_bsd as cext
 from . import _psutil_posix as cext_posix
+from ._common import FREEBSD
+from ._common import NETBSD
+from ._common import OPENBSD
 from ._common import AccessDenied
+from ._common import NoSuchProcess
+from ._common import ZombieProcess
 from ._common import conn_tmap
 from ._common import conn_to_ntuple
-from ._common import FREEBSD
 from ._common import memoize
 from ._common import memoize_when_activated
-from ._common import NETBSD
-from ._common import NoSuchProcess
-from ._common import OPENBSD
 from ._common import usage_percent
-from ._common import ZombieProcess
 from ._compat import FileNotFoundError
 from ._compat import PermissionError
 from ._compat import ProcessLookupError
@@ -177,10 +177,9 @@ else:
 
 
 def virtual_memory():
-    """System virtual memory as a namedtuple."""
     mem = cext.virtual_mem()
-    total, free, active, inactive, wired, cached, buffers, shared = mem
     if NETBSD:
+        total, free, active, inactive, wired, cached = mem
         # On NetBSD buffers and shared mem is determined via /proc.
         # The C ext set them to 0.
         with open('/proc/meminfo', 'rb') as f:
@@ -189,8 +188,25 @@ def virtual_memory():
                     buffers = int(line.split()[1]) * 1024
                 elif line.startswith(b'MemShared:'):
                     shared = int(line.split()[1]) * 1024
-    avail = inactive + cached + free
-    used = active + wired + cached
+        # Before avail was calculated as (inactive + cached + free),
+        # same as zabbix, but it turned out it could exceed total (see
+        # #2233), so zabbix seems to be wrong. Htop calculates it
+        # differently, and the used value seem more realistic, so let's
+        # match htop.
+        # https://github.com/htop-dev/htop/blob/e7f447b/netbsd/NetBSDProcessList.c#L162  # noqa
+        # https://github.com/zabbix/zabbix/blob/af5e0f8/src/libs/zbxsysinfo/netbsd/memory.c#L135  # noqa
+        used = active + wired
+        avail = total - used
+    else:
+        total, free, active, inactive, wired, cached, buffers, shared = mem
+        # matches freebsd-memory CLI:
+        # * https://people.freebsd.org/~rse/dist/freebsd-memory
+        # * https://www.cyberciti.biz/files/scripts/freebsd-memory.pl.txt
+        # matches zabbix:
+        # * https://github.com/zabbix/zabbix/blob/af5e0f8/src/libs/zbxsysinfo/freebsd/memory.c#L143  # noqa
+        avail = inactive + cached + free
+        used = active + wired + cached
+
     percent = usage_percent((total - avail), total, round_=1)
     return svmem(total, avail, percent, used, free,
                  active, inactive, buffers, cached, shared, wired)
@@ -249,19 +265,19 @@ def cpu_count_logical():
 
 
 if OPENBSD or NETBSD:
-    def cpu_count_physical():
+    def cpu_count_cores():
         # OpenBSD and NetBSD do not implement this.
         return 1 if cpu_count_logical() == 1 else None
 else:
-    def cpu_count_physical():
-        """Return the number of physical CPUs in the system."""
+    def cpu_count_cores():
+        """Return the number of CPU cores in the system."""
         # From the C module we'll get an XML string similar to this:
         # http://manpages.ubuntu.com/manpages/precise/man4/smp.4freebsd.html
         # We may get None in case "sysctl kern.sched.topology_spec"
         # is not supported on this BSD version, in which case we'll mimic
         # os.cpu_count() and return None.
         ret = None
-        s = cext.cpu_count_phys()
+        s = cext.cpu_topology()
         if s is not None:
             # get rid of padding chars appended at the end of the string
             index = s.rfind("</groups>")
@@ -274,8 +290,7 @@ else:
                     # needed otherwise it will memleak
                     root.clear()
         if not ret:
-            # If logical CPUs are 1 it's obvious we'll have only 1
-            # physical CPU.
+            # If logical CPUs == 1 it's obvious we' have only 1 core.
             if cpu_count_logical() == 1:
                 return 1
         return ret
@@ -309,6 +324,36 @@ def cpu_stats():
         ctxsw, intrs, soft_intrs, syscalls, traps, faults, forks = \
             cext.cpu_stats()
     return _common.scpustats(ctxsw, intrs, soft_intrs, syscalls)
+
+
+if FREEBSD:
+    def cpu_freq():
+        """Return frequency metrics for CPUs. As of Dec 2018 only
+        CPU 0 appears to be supported by FreeBSD and all other cores
+        match the frequency of CPU 0.
+        """
+        ret = []
+        num_cpus = cpu_count_logical()
+        for cpu in range(num_cpus):
+            try:
+                current, available_freq = cext.cpu_freq(cpu)
+            except NotImplementedError:
+                continue
+            if available_freq:
+                try:
+                    min_freq = int(available_freq.split(" ")[-1].split("/")[0])
+                except (IndexError, ValueError):
+                    min_freq = None
+                try:
+                    max_freq = int(available_freq.split(" ")[0].split("/")[0])
+                except (IndexError, ValueError):
+                    max_freq = None
+            ret.append(_common.scpufreq(current, min_freq, max_freq))
+        return ret
+elif OPENBSD:
+    def cpu_freq():
+        curr = float(cext.cpu_freq())
+        return [_common.scpufreq(curr, 0.0, 0.0)]
 
 
 # =====================================================================
@@ -352,7 +397,7 @@ def net_if_stats():
     for name in names:
         try:
             mtu = cext_posix.net_if_mtu(name)
-            isup = cext_posix.net_if_is_running(name)
+            flags = cext_posix.net_if_flags(name)
             duplex, speed = cext_posix.net_if_duplex_speed(name)
         except OSError as err:
             # https://github.com/giampaolo/psutil/issues/1279
@@ -361,42 +406,37 @@ def net_if_stats():
         else:
             if hasattr(_common, 'NicDuplex'):
                 duplex = _common.NicDuplex(duplex)
-            ret[name] = _common.snicstats(isup, duplex, speed, mtu)
+            output_flags = ','.join(flags)
+            isup = 'running' in flags
+            ret[name] = _common.snicstats(isup, duplex, speed, mtu,
+                                          output_flags)
     return ret
 
 
 def net_connections(kind):
     """System-wide network connections."""
-    if OPENBSD:
-        ret = []
-        for pid in pids():
-            try:
-                cons = Process(pid).connections(kind)
-            except (NoSuchProcess, ZombieProcess):
-                continue
-            else:
-                for conn in cons:
-                    conn = list(conn)
-                    conn.append(pid)
-                    ret.append(_common.sconn(*conn))
-        return ret
-
     if kind not in _common.conn_tmap:
         raise ValueError("invalid %r kind argument; choose between %s"
                          % (kind, ', '.join([repr(x) for x in conn_tmap])))
     families, types = conn_tmap[kind]
     ret = set()
-    if NETBSD:
+
+    if OPENBSD:
+        rawlist = cext.net_connections(-1, families, types)
+    elif NETBSD:
         rawlist = cext.net_connections(-1)
-    else:
+    else:  # FreeBSD
         rawlist = cext.net_connections()
+
     for item in rawlist:
         fd, fam, type, laddr, raddr, status, pid = item
-        # TODO: apply filter at C level
-        if fam in families and type in types:
-            nt = conn_to_ntuple(fd, fam, type, laddr, raddr, status,
-                                TCP_STATUSES, pid)
-            ret.add(nt)
+        if NETBSD or FREEBSD:
+            # OpenBSD implements filtering in C
+            if (fam not in families) or (type not in types):
+                continue
+        nt = conn_to_ntuple(fd, fam, type, laddr, raddr,
+                            status, TCP_STATUSES, pid)
+        ret.add(nt)
     return list(ret)
 
 
@@ -424,7 +464,7 @@ if FREEBSD:
         return _common.sbattery(percent, secsleft, power_plugged)
 
     def sensors_temperatures():
-        "Return CPU cores temperatures if available, else an empty dict."
+        """Return CPU cores temperatures if available, else an empty dict."""
         ret = defaultdict(list)
         num_cpus = cpu_count_logical()
         for cpu in range(num_cpus):
@@ -438,30 +478,6 @@ if FREEBSD:
             except NotImplementedError:
                 pass
 
-        return ret
-
-    def cpu_freq():
-        """Return frequency metrics for CPUs. As of Dec 2018 only
-        CPU 0 appears to be supported by FreeBSD and all other cores
-        match the frequency of CPU 0.
-        """
-        ret = []
-        num_cpus = cpu_count_logical()
-        for cpu in range(num_cpus):
-            try:
-                current, available_freq = cext.cpu_frequency(cpu)
-            except NotImplementedError:
-                continue
-            if available_freq:
-                try:
-                    min_freq = int(available_freq.split(" ")[-1].split("/")[0])
-                except(IndexError, ValueError):
-                    min_freq = None
-                try:
-                    max_freq = int(available_freq.split(" ")[0].split("/")[0])
-                except(IndexError, ValueError):
-                    max_freq = None
-            ret.append(_common.scpufreq(current, min_freq, max_freq))
         return ret
 
 
@@ -535,7 +551,7 @@ else:
 def is_zombie(pid):
     try:
         st = cext.proc_oneshot_info(pid)[kinfo_proc_map['status']]
-        return st == cext.SZOMB
+        return PROC_STATUSES.get(st) == _common.STATUS_ZOMBIE
     except Exception:
         return False
 
@@ -763,33 +779,27 @@ class Process(object):
         if kind not in conn_tmap:
             raise ValueError("invalid %r kind argument; choose between %s"
                              % (kind, ', '.join([repr(x) for x in conn_tmap])))
+        families, types = conn_tmap[kind]
+        ret = []
 
         if NETBSD:
-            families, types = conn_tmap[kind]
-            ret = []
             rawlist = cext.net_connections(self.pid)
-            for item in rawlist:
-                fd, fam, type, laddr, raddr, status, pid = item
-                assert pid == self.pid
-                if fam in families and type in types:
-                    nt = conn_to_ntuple(fd, fam, type, laddr, raddr, status,
-                                        TCP_STATUSES)
-                    ret.append(nt)
-            self._assert_alive()
-            return list(ret)
+        elif OPENBSD:
+            rawlist = cext.net_connections(self.pid, families, types)
+        else:  # FreeBSD
+            rawlist = cext.proc_connections(self.pid, families, types)
 
-        families, types = conn_tmap[kind]
-        rawlist = cext.proc_connections(self.pid, families, types)
-        ret = []
         for item in rawlist:
-            fd, fam, type, laddr, raddr, status = item
+            fd, fam, type, laddr, raddr, status = item[:6]
+            if NETBSD:
+                # FreeBSD and OpenBSD implement filtering in C
+                if (fam not in families) or (type not in types):
+                    continue
             nt = conn_to_ntuple(fd, fam, type, laddr, raddr, status,
                                 TCP_STATUSES)
             ret.append(nt)
 
-        if OPENBSD:
-            self._assert_alive()
-
+        self._assert_alive()
         return ret
 
     @wrap_exceptions
@@ -825,11 +835,11 @@ class Process(object):
         # sometimes we get an empty string, in which case we turn
         # it into None
         if OPENBSD and self.pid == 0:
-            return None  # ...else it would raise EINVAL
+            return ""  # ...else it would raise EINVAL
         elif NETBSD or HAS_PROC_OPEN_FILES:
             # FreeBSD < 8 does not support functions based on
             # kinfo_getfile() and kinfo_getvmmap()
-            return cext.proc_cwd(self.pid) or None
+            return cext.proc_cwd(self.pid)
         else:
             raise NotImplementedError(
                 "supported only starting from FreeBSD 8" if

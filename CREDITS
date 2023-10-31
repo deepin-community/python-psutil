@@ -85,7 +85,7 @@ I: 18
 N: Thomas Klausner
 W: https://github.com/0-wiz-0
 D: NetBSD implementation (co-author).
-I: 557
+I: 557, 2128
 
 N: Ryo Onodera
 W: https://github.com/ryoon
@@ -94,6 +94,13 @@ I: 557
 
 Donations
 -------------------------------------------------------------------------------
+
+N: aristocratos
+W: https://github.com/aristocratos
+
+N: Daniel Widdis
+C: Washington, USA
+W: https://github.com/dbwiddis
 
 N: Rodion Stratov
 C: Canada
@@ -538,7 +545,7 @@ I: 1042, 1079, 1070
 
 N: Oleksii Shevchuk
 W: https://github.com/alxchk
-I: 1077, 1093, 1091, 1220, 1346
+I: 1077, 1093, 1091, 1220, 1346, 1904
 
 N: Prodesire
 W: https://github.com/Prodesire
@@ -684,7 +691,7 @@ I: 1616
 N: Po-Chuan Hsieh
 W: https://github.com/sunpoet
 C: Taiwan
-I: 1646
+I: 1646, 2186
 
 N: Javad Karabi
 W: https://github.com/karabijavad
@@ -725,3 +732,84 @@ I: 1620, 1727
 N: Tim Schlueter
 W: https://github.com/modelrockettier
 I: 1822
+
+N: marxin
+W: https://github.com/marxin
+I: 1851
+
+N: guille
+W: https://github.com/guille
+I: 1913
+
+N: David Knaack
+W: https://github.com/davidkna
+I: 1921
+
+N: Nikita Radchenko
+W: https://github.com/nradchenko
+I: 1940
+
+N: MaWe2019
+W: https://github.com/MaWe2019
+I: 1953
+
+N: Dmitry Gorbunov
+C: Russia
+E: gorbunov.dmitry.1999@gmail.com
+W: https://gorbunov-dmitry.github.io
+D: fix typos in documentation
+
+N: Pablo Baeyens
+W: https://github.com/mx-psi
+I: 1598
+
+N: Xuehai Pan
+W: https://github.com/XuehaiPan
+I: 1948
+
+N: Saeed Rasooli
+W: https://github.com/ilius
+I: 1996
+
+N: PetrPospisil
+W: https://github.com/PetrPospisil
+I: 1980
+
+N: Olivier Dormond
+W: https://github.com/odormond
+I: 1956
+
+N: Matthieu Darbois
+W: https://github.com/mayeut
+I: 2039, 2142, 2147, 2153, 2040, 2102, 2216
+
+N: Hugo van Kemenade
+W: https://github.com/hugovk
+I: 2099
+
+N: Torsten Blum
+I: 2114
+
+N: Chris Lalancette
+W: https://github.com/clalancette
+I: 2037
+
+N: Bernhard Urban-Forster
+C: Austria
+W: https://github.com/lewurm
+I: 2135
+
+N: Daniel Li
+I: 2150
+
+N: Daniel Widdis
+W: https://github.com/dbwiddis
+I: 2077, 2160
+
+N: Amir Rossert
+W: https://github.com/arossert
+I: 2156
+
+N: Lawrence D'Anna
+W: https://github.com/smoofra
+I: 2010

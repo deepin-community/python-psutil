@@ -8,10 +8,10 @@ Subject: dont depend on install when running tests
 
 --- a/Makefile
 +++ b/Makefile
-@@ -117,63 +117,48 @@ setup-dev-env:  ## Install GIT hooks, pi
+@@ -127,59 +127,45 @@ setup-dev-env:  ## Install GIT hooks, pi
  # ===================================================================
  
- test:  ## Run all tests.
+ test:  ## Run all tests. To run a specific test do "make test ARGS=psutil.tests.test_system.TestDiskAPIs"
 -	${MAKE} build
  	$(TEST_PREFIX) $(PYTHON) $(TSCRIPT) $(ARGS)
  
@@ -59,10 +59,6 @@ Subject: dont depend on install when running tests
 -	${MAKE} build
  	$(TEST_PREFIX) $(PYTHON) $(TSCRIPT) $(ARGS) psutil/tests/test_memleaks.py
  
- test-by-name:  ## e.g. make test-by-name ARGS=psutil.tests.test_system.TestSystemAPIs
--	${MAKE} build
- 	$(TEST_PREFIX) $(PYTHON) $(TSCRIPT) $(ARGS)
- 
  test-failed:  ## Re-run tests which failed on last run
 -	${MAKE} build
  	$(TEST_PREFIX) $(PYTHON) $(TSCRIPT) $(ARGS) --last-failed
@@ -71,4 +67,4 @@ Subject: dont depend on install when running tests
 -	${MAKE} build
  	# Note: coverage options are controlled by .coveragerc file
  	rm -rf .coverage htmlcov
- 	$(TEST_PREFIX) $(PYTHON) -m coverage run $(TSCRIPT)
+ 	$(TEST_PREFIX) $(PYTHON) -m coverage run -m unittest -v

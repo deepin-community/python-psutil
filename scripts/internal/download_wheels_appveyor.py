@@ -7,16 +7,18 @@
 """
 Script which downloads wheel files hosted on AppVeyor:
 https://ci.appveyor.com/project/giampaolo/psutil
-Readapted from the original recipe of Ibarra Corretge'
+Re-adapted from the original recipe of Ibarra Corretge'
 <saghul@gmail.com>:
 http://code.saghul.net/index.php/2015/09/09/
 """
 
 from __future__ import print_function
+
 import concurrent.futures
 import os
-import requests
 import sys
+
+import requests
 
 from psutil import __version__ as PSUTIL_VERSION
 from psutil._common import bytes2human
@@ -26,7 +28,7 @@ from psutil._common import print_color
 USER = "giampaolo"
 PROJECT = "psutil"
 BASE_URL = 'https://ci.appveyor.com/api'
-PY_VERSIONS = ['2.7', '3.6', '3.7', '3.8', '3.9']
+PY_VERSIONS = ['2.7']
 TIMEOUT = 30
 
 
@@ -99,9 +101,9 @@ def run():
     # 2 wheels (32 and 64 bit) per supported python version
     expected = len(PY_VERSIONS) * 2
     if expected != completed:
-        return exit("expected %s files, got %s" % (expected, completed))
+        return sys.exit("expected %s files, got %s" % (expected, completed))
     if exc:
-        return exit()
+        return sys.exit()
     rename_win27_wheels()
 
 

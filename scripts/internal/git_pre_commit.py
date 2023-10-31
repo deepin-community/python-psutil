@@ -13,6 +13,7 @@ the files which were modified in the commit. Checks:
 - assert not pdb.set_trace in code
 - assert no bare except clause ("except:") in code
 - assert "flake8" checks pass
+- assert "isort" checks pass
 - assert C linter checks pass
 - abort if files were added/renamed/removed and MANIFEST.in was not updated
 
@@ -20,7 +21,9 @@ Install this with "make install-git-hooks".
 """
 
 from __future__ import print_function
+
 import os
+import shlex
 import subprocess
 import sys
 
@@ -104,38 +107,46 @@ def main():
             # space at end of line
             if line.endswith(' '):
                 print("%s:%s %r" % (path, lineno, line))
-                return exit("space at end of line")
+                return sys.exit("space at end of line")
             line = line.rstrip()
-            # pdb
-            if "pdb.set_trace" in line:
-                print("%s:%s %s" % (path, lineno, line))
-                return exit("you forgot a pdb in your python code")
-            # bare except clause
-            if "except:" in line and not line.endswith("# NOQA"):
-                print("%s:%s %s" % (path, lineno, line))
-                return exit("bare except clause")
+            # # pdb (now provided by flake8-debugger plugin)
+            # if "pdb.set_trace" in line:
+            #     print("%s:%s %s" % (path, lineno, line))
+            #     return sys.exit("you forgot a pdb in your python code")
+            # # bare except clause (now provided by flake8-blind-except plugin)
+            # if "except:" in line and not line.endswith("# NOQA"):
+            #     print("%s:%s %s" % (path, lineno, line))
+            #     return sys.exit("bare except clause")
 
-    # Python linter
+    # Python linters
     if py_files:
+        # flake8
         assert os.path.exists('.flake8')
-        # XXX: we should escape spaces and possibly other amenities here
         cmd = "%s -m flake8 --config=.flake8 %s" % (PYTHON, " ".join(py_files))
-        ret = subprocess.call(cmd, shell=True)
+        ret = subprocess.call(shlex.split(cmd))
         if ret != 0:
-            return exit("python code is not flake8 compliant")
+            return sys.exit("python code didn't pass 'flake8' style check; "
+                            "try running 'make fix-flake8'")
+        # isort
+        cmd = "%s -m isort --check-only %s" % (
+            PYTHON, " ".join(py_files))
+        ret = subprocess.call(shlex.split(cmd))
+        if ret != 0:
+            return sys.exit("python code didn't pass 'isort' style check; "
+                            "try running 'make fix-imports'")
     # C linter
     if c_files:
         # XXX: we should escape spaces and possibly other amenities here
         cmd = "%s scripts/internal/clinter.py %s" % (PYTHON, " ".join(c_files))
         ret = subprocess.call(cmd, shell=True)
         if ret != 0:
-            return exit("C code didn't pass style check")
+            return sys.exit("C code didn't pass style check")
     if new_rm_mv:
         out = sh("%s scripts/internal/generate_manifest.py" % PYTHON)
         with open_text('MANIFEST.in') as f:
             if out.strip() != f.read().strip():
-                exit("some files were added, deleted or renamed; "
-                     "run 'make generate-manifest' and commit again")
+                sys.exit("some files were added, deleted or renamed; "
+                         "run 'make generate-manifest' and commit again")
 
 
 main()

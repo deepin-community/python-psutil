@@ -1,3 +1,19 @@
+python-psutil (5.9.8-2) unstable; urgency=medium
+
+  * drop DPT
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 02 Mar 2024 14:08:06 -0500
+
+python-psutil (5.9.8-1) unstable; urgency=medium
+
+  * New upstream release
+  * debian/patches/0001-dont-depend-on-install-when-running-tests.patch
+    - refresh patch
+  * stop building the -doc package; Closes: #1054807, #1046471
+  * build using pybuild-plugin-pyproject
+
+ -- Sandro Tosi <morph@debian.org>  Sat, 20 Jan 2024 02:02:15 -0500
+
 python-psutil (5.9.5-1) unstable; urgency=medium
 
   * New upstream release

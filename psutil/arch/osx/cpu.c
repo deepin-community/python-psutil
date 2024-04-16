@@ -19,16 +19,20 @@ For reference, here's the git history with original implementations:
 */
 
 #include <Python.h>
-#include <sys/sysctl.h>
-#include <sys/vmmeter.h>
-
 #include <mach/mach_error.h>
 #include <mach/mach_host.h>
 #include <mach/mach_port.h>
+#include <mach/mach_vm.h>
+#include <sys/sysctl.h>
+#include <sys/vmmeter.h>
+#include <mach/mach.h>
+#if defined(__arm64__) || defined(__aarch64__)
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
+#endif
 
 #include "../../_psutil_common.h"
 #include "../../_psutil_posix.h"
-
 
 
 PyObject *
@@ -109,7 +113,122 @@ psutil_cpu_stats(PyObject *self, PyObject *args) {
     );
 }
 
+#if defined(__arm64__) || defined(__aarch64__)
+PyObject *
+psutil_cpu_freq(PyObject *self, PyObject *args) {
+    uint32_t min;
+    uint32_t curr;
+    uint32_t pMin;
+    uint32_t eMin;
+    uint32_t max;
+    kern_return_t status;
+    CFDictionaryRef matching = NULL;
+    CFTypeRef pCoreRef = NULL;
+    CFTypeRef eCoreRef = NULL;
+    io_iterator_t iter = 0;
+    io_registry_entry_t entry = 0;
+    io_name_t name;
 
+    matching = IOServiceMatching("AppleARMIODevice");
+    if (matching == 0) {
+        return PyErr_Format(
+            PyExc_RuntimeError,
+            "IOServiceMatching call failed, 'AppleARMIODevice' not found"
+        );
+    }
+
+    status = IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iter);
+    if (status != KERN_SUCCESS) {
+        PyErr_Format(
+            PyExc_RuntimeError, "IOServiceGetMatchingServices call failed"
+        );
+        goto error;
+    }
+
+    while ((entry = IOIteratorNext(iter)) != 0) {
+        status = IORegistryEntryGetName(entry, name);
+        if (status != KERN_SUCCESS) {
+            IOObjectRelease(entry);
+            continue;
+        }
+        if (strcmp(name, "pmgr") == 0) {
+            break;
+        }
+        IOObjectRelease(entry);
+    }
+
+    if (entry == 0) {
+        PyErr_Format(
+            PyExc_RuntimeError,
+            "'pmgr' entry was not found in AppleARMIODevice service"
+        );
+        goto error;
+    }
+
+    pCoreRef = IORegistryEntryCreateCFProperty(
+        entry, CFSTR("voltage-states5-sram"), kCFAllocatorDefault, 0);
+    if (pCoreRef == NULL) {
+        PyErr_Format(
+            PyExc_RuntimeError, "'voltage-states5-sram' property not found");
+        goto error;
+    }
+
+    eCoreRef = IORegistryEntryCreateCFProperty(
+        entry, CFSTR("voltage-states1-sram"), kCFAllocatorDefault, 0);
+    if (eCoreRef == NULL) {
+        PyErr_Format(
+            PyExc_RuntimeError, "'voltage-states1-sram' property not found");
+        goto error;
+    }
+
+    size_t pCoreLength = CFDataGetLength(pCoreRef);
+    size_t eCoreLength = CFDataGetLength(eCoreRef);
+    if (pCoreLength < 8) {
+        PyErr_Format(
+            PyExc_RuntimeError,
+            "expected 'voltage-states5-sram' buffer to have at least size 8"
+        );
+        goto error;
+    }
+    if (eCoreLength < 4) {
+        PyErr_Format(
+            PyExc_RuntimeError,
+            "expected 'voltage-states1-sram' buffer to have at least size 4"
+        );
+        goto error;
+    }
+
+    CFDataGetBytes(pCoreRef, CFRangeMake(0, 4), (UInt8 *) &pMin);
+    CFDataGetBytes(eCoreRef, CFRangeMake(0, 4), (UInt8 *) &eMin);
+    CFDataGetBytes(pCoreRef, CFRangeMake(pCoreLength - 8, 4), (UInt8 *) &max);
+
+    min = pMin < eMin ? pMin : eMin;
+    curr = max;
+
+    CFRelease(pCoreRef);
+    CFRelease(eCoreRef);
+    IOObjectRelease(iter);
+    IOObjectRelease(entry);
+
+    return Py_BuildValue(
+        "IKK",
+        curr / 1000 / 1000,
+        min / 1000 / 1000,
+        max / 1000 / 1000
+    );
+
+error:
+    if (pCoreRef != NULL)
+        CFRelease(pCoreRef);
+    if (eCoreRef != NULL)
+        CFRelease(eCoreRef);
+    if (iter != 0)
+        IOObjectRelease(iter);
+    if (entry != 0)
+        IOObjectRelease(entry);
+    return NULL;
+}
+#else
 PyObject *
 psutil_cpu_freq(PyObject *self, PyObject *args) {
     unsigned int curr;
@@ -137,4 +256,67 @@ psutil_cpu_freq(PyObject *self, PyObject *args) {
         curr / 1000 / 1000,
         min / 1000 / 1000,
         max / 1000 / 1000);
+}
+#endif
+
+PyObject *
+psutil_per_cpu_times(PyObject *self, PyObject *args) {
+    natural_t cpu_count;
+    natural_t i;
+    processor_info_array_t info_array;
+    mach_msg_type_number_t info_count;
+    kern_return_t error;
+    processor_cpu_load_info_data_t *cpu_load_info = NULL;
+    int ret;
+    PyObject *py_retlist = PyList_New(0);
+    PyObject *py_cputime = NULL;
+
+    if (py_retlist == NULL)
+        return NULL;
+
+    mach_port_t host_port = mach_host_self();
+    error = host_processor_info(host_port, PROCESSOR_CPU_LOAD_INFO,
+                                &cpu_count, &info_array, &info_count);
+    if (error != KERN_SUCCESS) {
+        PyErr_Format(
+            PyExc_RuntimeError,
+            "host_processor_info(PROCESSOR_CPU_LOAD_INFO) syscall failed: %s",
+             mach_error_string(error));
+        goto error;
+    }
+    mach_port_deallocate(mach_task_self(), host_port);
+
+    cpu_load_info = (processor_cpu_load_info_data_t *) info_array;
+
+    for (i = 0; i < cpu_count; i++) {
+        py_cputime = Py_BuildValue(
+            "(dddd)",
+            (double)cpu_load_info[i].cpu_ticks[CPU_STATE_USER] / CLK_TCK,
+            (double)cpu_load_info[i].cpu_ticks[CPU_STATE_NICE] / CLK_TCK,
+            (double)cpu_load_info[i].cpu_ticks[CPU_STATE_SYSTEM] / CLK_TCK,
+            (double)cpu_load_info[i].cpu_ticks[CPU_STATE_IDLE] / CLK_TCK
+        );
+        if (!py_cputime)
+            goto error;
+        if (PyList_Append(py_retlist, py_cputime))
+            goto error;
+        Py_CLEAR(py_cputime);
+    }
+
+    ret = vm_deallocate(mach_task_self(), (vm_address_t)info_array,
+                        info_count * sizeof(int));
+    if (ret != KERN_SUCCESS)
+        PyErr_WarnEx(PyExc_RuntimeWarning, "vm_deallocate() failed", 2);
+    return py_retlist;
+
+error:
+    Py_XDECREF(py_cputime);
+    Py_DECREF(py_retlist);
+    if (cpu_load_info != NULL) {
+        ret = vm_deallocate(mach_task_self(), (vm_address_t)info_array,
+                            info_count * sizeof(int));
+        if (ret != KERN_SUCCESS)
+            PyErr_WarnEx(PyExc_RuntimeWarning, "vm_deallocate() failed", 2);
+    }
+    return NULL;
 }
